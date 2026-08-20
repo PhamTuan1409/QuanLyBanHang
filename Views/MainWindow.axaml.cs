@@ -7,9 +7,9 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using SalesDemo.Models;
 using SalesDemo.Services;
+using System.Linq;
 
 namespace SalesDemo.Views;
-
 public partial class MainWindow : Window
 {
     private readonly DatabaseHelper _db = new();
@@ -138,36 +138,62 @@ public partial class MainWindow : Window
 
     // Bam nhanh nut "+ Gio" ngay tren card san pham (mac dinh so luong = 1)
     private void OnThemNhanhVaoGio(object? sender, RoutedEventArgs e)
+{
+    if (sender is Button btn && btn.Tag is SanPham sp)
     {
-        if (sender is Button btn && btn.Tag is SanPham sp)
+        if (!sp.ConHang) return;
+
+        // Neu san pham da co trong gio hang roi thi cong don so luong, khong tao dong moi
+        var existing = _gioHang.FirstOrDefault(x => x.MaSP == sp.MaSP);
+        if (existing != null)
         {
-            if (!sp.ConHang) return;
+            existing.SoLuong += 1;
+            // Bat ItemsControl cap nhat lai vi ObservableCollection khong tu bat thay doi property ben trong item
+            var index = _gioHang.IndexOf(existing);
+            _gioHang.RemoveAt(index);
+            _gioHang.Insert(index, existing);
+        }
+        else
+        {
             _gioHang.Add(new ChiTietHoaDonItem { MaSP = sp.MaSP, TenSP = sp.TenSP, SoLuong = 1, DonGia = sp.GiaBan });
-            CapNhatTongTien();
-            SetStatus($"Da them '{sp.TenSP}' vao gio hang.");
-        }
-    }
-
-    private void OnThemVaoGio(object? sender, RoutedEventArgs e)
-    {
-        if (CboSanPham.SelectedItem is not SanPham sp)
-        {
-            ShowInlineError("Vui long chon san pham.");
-            return;
         }
 
-        int soLuong = (int)(NumSoLuong.Value ?? 1);
-
-        if (soLuong > sp.SoLuongTon)
-        {
-            ShowInlineError($"San pham '{sp.TenSP}' chi con {sp.SoLuongTon}, khong du de them {soLuong}.");
-            return;
-        }
-
-        _gioHang.Add(new ChiTietHoaDonItem { MaSP = sp.MaSP, TenSP = sp.TenSP, SoLuong = soLuong, DonGia = sp.GiaBan });
         CapNhatTongTien();
+        SetStatus($"Da them '{sp.TenSP}' vao gio hang.");
+    }
+}
+
+   private void OnThemVaoGio(object? sender, RoutedEventArgs e)
+{
+    if (CboSanPham.SelectedItem is not SanPham sp)
+    {
+        ShowInlineError("Vui long chon san pham.");
+        return;
     }
 
+    int soLuong = (int)(NumSoLuong.Value ?? 1);
+
+    if (soLuong > sp.SoLuongTon)
+    {
+        ShowInlineError($"San pham '{sp.TenSP}' chi con {sp.SoLuongTon}, khong du de them {soLuong}.");
+        return;
+    }
+
+    var existing = _gioHang.FirstOrDefault(x => x.MaSP == sp.MaSP);
+    if (existing != null)
+    {
+        existing.SoLuong += soLuong;
+        var index = _gioHang.IndexOf(existing);
+        _gioHang.RemoveAt(index);
+        _gioHang.Insert(index, existing);
+    }
+    else
+    {
+        _gioHang.Add(new ChiTietHoaDonItem { MaSP = sp.MaSP, TenSP = sp.TenSP, SoLuong = soLuong, DonGia = sp.GiaBan });
+    }
+
+    CapNhatTongTien();
+}
     private void CapNhatTongTien()
     {
         decimal tong = 0;
