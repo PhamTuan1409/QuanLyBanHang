@@ -1,11 +1,14 @@
+using System;
+
 namespace SalesDemo.Models;
 
-// Model tuong ung bang KHACH_HANG trong CSDL
 public class KhachHang
 {
     public int MaKH { get; set; }
     public string HoTen { get; set; } = "";
+    public string SoDienThoai { get; set; } = "";
+    public string? Email { get; set; }
+    public string? DiaChi { get; set; }
     public string HangThanhVien { get; set; } = "Bac";
-
-    public override string ToString() => $"{HoTen} ({HangThanhVien})";
+    public DateTime NgayDangKy { get; set; }
 }
