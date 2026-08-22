@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:models="using:SalesDemo.Models"
-        xmlns:asyncImg="using:AsyncImageLoader"
         x:Class="SalesDemo.Views.MainWindow"
         Title="Quản lý Bán hàng"
         Width="1050" Height="680"
@@ -71,8 +70,9 @@
 
                     <Border DockPanel.Dock="Top" Classes="card" Margin="0,0,0,12">
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBox x:Name="TxtTimKiem" Watermark="🔍 Tìm kiếm sản phẩm..." Width="280" />
-                            <ComboBox x:Name="CboDanhMuc" Width="200" />
+                            <TextBox x:Name="TxtTimKiem" Watermark="🔍 Tìm kiếm sản phẩm..." Width="280"
+                                     TextChanged="OnTimKiemThayDoi" />
+                            <ComboBox x:Name="CboDanhMuc" Width="200" SelectionChanged="OnDanhMucThayDoi" />
                             <TextBlock x:Name="TxtLoadingSanPham" Text="" VerticalAlignment="Center" Foreground="#888" FontStyle="Italic" />
                         </StackPanel>
                     </Border>
@@ -89,7 +89,10 @@
                                     <Border Classes="card" Width="220" Margin="0,0,12,12" Padding="0">
                                         <StackPanel>
                                             <Panel>
-                                                <asyncImg:AdvancedImage Source="{Binding ImageUrl}" Width="220" Height="150" Stretch="UniformToFill" />
+                                               <Image Source="{Binding ProductImage}"
+                                                      Width="220"
+                                                      Height="150"
+                                                      Stretch="Uniform"/>
                                                 <Border Background="{Binding SoLuongTon, Converter={x:Static models:StockColorConverter.Instance}}"
                                                         CornerRadius="10" Padding="8,4" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
                                                     <TextBlock Text="{Binding TrangThaiTonKho}" Foreground="White" FontSize="11" FontWeight="Bold" />
@@ -99,6 +102,7 @@
                                                 <TextBlock Text="{Binding TenSP}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" Foreground="#222222" />
                                                 <TextBlock Text="{Binding GiaBan, StringFormat='{}{0:N0} đ'}" FontWeight="Bold" FontSize="16" Foreground="#123F5D" />
                                                 <Button Content="{Binding NutThemVaoGioText}" IsEnabled="{Binding ConHang}"
+                                                        Tag="{Binding}" Click="OnThemNhanhVaoGio"
                                                         Classes="secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4,0,0" />
                                             </StackPanel>
                                         </StackPanel>
@@ -119,7 +123,7 @@
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <TextBlock Text="👤 Khách hàng:" VerticalAlignment="Center" Width="100" Foreground="#222222" />
                                 <ComboBox x:Name="CboKhachHang" Width="220" PlaceholderText="Chọn khách hàng..." />
-                                
+
                                 <TextBox x:Name="TxtTenKhachHang" Width="180" Watermark="Tên mới..." />
                                 <TextBox x:Name="TxtSoDienThoai" Width="140" Watermark="SĐT mới..." />
 
@@ -135,6 +139,7 @@
                                 <ComboBox x:Name="CboSanPham" Width="220" PlaceholderText="Chọn sản phẩm..." />
                                 <TextBlock Text="Số lượng:" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#222222" />
                                 <NumericUpDown x:Name="NumSoLuong" Width="110" Minimum="1" Value="1" />
+                                <Button Content="➕ Thêm vào giỏ" Classes="secondary" Click="OnThemVaoGio" VerticalAlignment="Center" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -143,7 +148,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBlock x:Name="TxtTongTien" Grid.Column="0" Text="Tạm tính: 0 đ"
                                        VerticalAlignment="Center" FontWeight="Bold" FontSize="18" Foreground="#123F5D" />
-                            <Button Grid.Column="1" Content="✅ XÁC NHẬN ĐẶT HÀNG" Classes="primary" />
+                            <Button Grid.Column="1" Content="✅ XÁC NHẬN ĐẶT HÀNG" Classes="primary" Click="OnLuuHoaDon" />
                         </Grid>
                     </Border>
 
@@ -172,6 +177,12 @@
             <!-- TAB 3: Đơn hàng -->
             <TabItem Header="📋 Đơn hàng">
                 <DockPanel Margin="16">
+                    <Border DockPanel.Dock="Top" Classes="card" Margin="0,0,0,12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="📋 Danh sách đơn hàng" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" Foreground="#123F5D" />
+                            <Button Grid.Column="1" Content="🔄 Làm mới" Classes="secondary" Click="OnRefreshDonHang" />
+                        </Grid>
+                    </Border>
                     <ScrollViewer>
                         <ItemsControl x:Name="ListDonHang">
                             <ItemsControl.ItemTemplate>
@@ -208,7 +219,7 @@
                                 <ComboBox x:Name="CboSanPhamNhap" Width="300" PlaceholderText="Chọn sản phẩm..." />
                                 <TextBlock Text="Số lượng:" VerticalAlignment="Center" Foreground="#222222" />
                                 <NumericUpDown x:Name="NumSoLuongNhap" Width="120" Minimum="1" Value="1" />
-                                <Button Content="📥 NHẬP HÀNG" Classes="primary" />
+                                <Button Content="📥 NHẬP HÀNG" Classes="primary" Click="OnNhapHang" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

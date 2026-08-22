@@ -21,4 +21,7 @@
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/Products/**/*.png" />
+  </ItemGroup>
 </Project>
