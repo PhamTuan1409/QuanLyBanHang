@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.Text;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
@@ -16,42 +18,66 @@ public class SanPham
 
     public bool ConHang => SoLuongTon > 0;
 
-   public string ImageUrl => MaSP switch
-{
-    1 => "avares://SalesDemo/Assets/Products/goi-ngu-cotton.png",
-    2 => "avares://SalesDemo/Assets/Products/goi-co-du-lich.png",
-    3 => "avares://SalesDemo/Assets/Products/chan-mong-mua-he.png",
-    4 => "avares://SalesDemo/Assets/Products/default.png",
-    5 => "avares://SalesDemo/Assets/Products/default.png",
-    6 => "avares://SalesDemo/Assets/Products/ly-giu-nhiet-500ml.png",
-    7 => "avares://SalesDemo/Assets/Products/binh-nuoc-the-thao.png",
-    8 => "avares://SalesDemo/Assets/Products/coc-su.png",
-    9 => "avares://SalesDemo/Assets/Products/default.png",
-    10 => "avares://SalesDemo/Assets/Products/so-tay.png",
-    11 => "avares://SalesDemo/Assets/Products/but-gel.png",
-    12 => "avares://SalesDemo/Assets/Products/tai-nghe-bluetooth.png",
-    13 => "avares://SalesDemo/Assets/Products/den-ngu-mini.png",
-    14 => "avares://SalesDemo/Assets/Products/tai-nghe-bluetooth.png",
-    15 => "avares://SalesDemo/Assets/Products/default.png",
-    _ => "avares://SalesDemo/Assets/Products/default.png"
-};
-
-    public Bitmap? ProductImage
-{
-    get
+    // Chuyển "Khăn mặt cotton" -> "khan-mat-cotton"
+    private static string ChuanHoaTenFile(string ten)
     {
-        try
+        string s = ten.Trim().ToLowerInvariant();
+
+        // Bỏ dấu tiếng Việt
+        string normalized = s.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var c in normalized)
         {
-            var uri = new Uri(ImageUrl);
-            var asset = AssetLoader.Open(uri);
-            return new Bitmap(asset);
+            var uc = CharUnicodeInfo.GetUnicodeCategory(c);
+            if (uc != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
         }
-        catch
+        s = sb.ToString().Normalize(NormalizationForm.FormC);
+        s = s.Replace('đ', 'd').Replace('Đ', 'D');
+
+        // Khoảng trắng / ký tự lạ -> dấu gạch ngang
+        var result = new StringBuilder();
+        foreach (var c in s)
         {
-            return null;
+            if (char.IsLetterOrDigit(c)) result.Append(c);
+            else if (c == ' ') result.Append('-');
+        }
+
+        return result.ToString();
+    }
+
+    public string ImageUrl
+    {
+        get
+        {
+            string slug = ChuanHoaTenFile(TenSP);
+            string uriDuDoan = $"avares://SalesDemo/Assets/Products/{slug}.png";
+
+            if (AssetLoader.Exists(new Uri(uriDuDoan)))
+                return uriDuDoan;
+
+            // Không tìm thấy ảnh khớp tên -> dùng ảnh mặc định
+            return "avares://SalesDemo/Assets/Products/default.png";
         }
     }
-}
+
+    public Bitmap? ProductImage
+    {
+        get
+        {
+            try
+            {
+                var uri = new Uri(ImageUrl);
+                var asset = AssetLoader.Open(uri);
+                return new Bitmap(asset);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
+
     public string TrangThaiTonKho
         => ConHang ? $"Còn {SoLuongTon}" : "Hết hàng";
 

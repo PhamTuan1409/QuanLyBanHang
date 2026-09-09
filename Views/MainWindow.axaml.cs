@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<SanPham> _dsSanPham = new();
     private readonly ObservableCollection<ChiTietHoaDonItem> _gioHang = new();
     private readonly ObservableCollection<DonHang> _dsDonHang = new();
+    private readonly ObservableCollection<LichSuNhapHang> _lichSuNhap = new();
 
     private bool _daKhoiTaoXong = false;
 
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
         ListSanPham.ItemsSource = _dsSanPham;
         ListGioHang.ItemsSource = _gioHang;
         ListDonHang.ItemsSource = _dsDonHang;
+        ListLichSuNhap.ItemsSource = _lichSuNhap;
 
         _ = TaiDuLieuBanDauAsync();
     }
@@ -47,8 +49,7 @@ public partial class MainWindow : Window
            CboDanhMuc.ItemsSource = danhMucList;
            CboDanhMuc.SelectedIndex = 0;
 
-            var khachHangList = await Task.Run(() => _db.LayDanhSachKhachHang());
-            CboKhachHang.ItemsSource = khachHangList;
+            await TaiKhachHangAsync();
 
             await TaiSanPhamAsync();
             CboSanPham.ItemsSource = _dsSanPham;
@@ -56,6 +57,7 @@ public partial class MainWindow : Window
             CboSanPhamNhap.ItemsSource = _dsSanPham;
 
             await TaiDonHangAsync();
+            await TaiLichSuNhapAsync();
 
             _daKhoiTaoXong = true;
             SetStatus($"Da tai {_dsSanPham.Count} san pham.");
@@ -96,6 +98,21 @@ public partial class MainWindow : Window
         var list = await Task.Run(() => _db.LayDanhSachDonHang());
         _dsDonHang.Clear();
         foreach (var dh in list) _dsDonHang.Add(dh);
+    }
+
+    private async Task TaiLichSuNhapAsync()
+    {
+        var list = await Task.Run(() => _db.LayLichSuNhapHang(7));
+        _lichSuNhap.Clear();
+        foreach (var ls in list) _lichSuNhap.Add(ls);
+        TxtLichSuTrong.IsVisible = _lichSuNhap.Count == 0;
+    }
+
+    // Tải (hoặc tải lại) danh sách khách hàng cho ComboBox
+    private async Task TaiKhachHangAsync()
+    {
+        var khachHangList = await Task.Run(() => _db.LayDanhSachKhachHang());
+        CboKhachHang.ItemsSource = khachHangList;
     }
 
     private async void OnTimKiemThayDoi(object? sender, Avalonia.Controls.TextChangedEventArgs e)
@@ -262,9 +279,38 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Khong cho vua chon khach cu vua go ten moi cung luc, tranh nham lan
+        string tenMoi = TxtTenKhachHang.Text?.Trim() ?? "";
+        string sdtMoi = TxtSoDienThoai.Text?.Trim() ?? "";
+        bool coKhachMoi = !string.IsNullOrWhiteSpace(tenMoi);
+        bool coKhachDaChon = CboKhachHang.SelectedItem is KhachHang;
+
+        if (coKhachMoi && coKhachDaChon)
+        {
+            ShowInlineError("Ban vua chon khach hang co san, vua nhap ten moi. Chi chon 1 trong 2.");
+            return;
+        }
+
         try
         {
-            int? maKH = (CboKhachHang.SelectedItem as KhachHang)?.MaKH;
+            int? maKH;
+
+            if (coKhachMoi)
+            {
+                // Khach moi -> them vao CSDL, lay MaKH vua tao
+                maKH = await Task.Run(() => _db.ThemKhachHang(tenMoi, sdtMoi));
+            }
+            else if (CboKhachHang.SelectedItem is KhachHang khachDaChon)
+            {
+                // Khach cu -> mua lai, dung MaKH co san
+                maKH = khachDaChon.MaKH;
+            }
+            else
+            {
+                // Khach vang lai, khong luu thong tin
+                maKH = null;
+            }
+
             string hinhThucTT = (CboHinhThucTT.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Tien mat";
             const int maNVDangNhap = 1;
 
@@ -279,8 +325,14 @@ public partial class MainWindow : Window
 
             _gioHang.Clear();
             CapNhatTongTien();
+
+            TxtTenKhachHang.Text = "";
+            TxtSoDienThoai.Text = "";
+            CboKhachHang.SelectedItem = null;
+
             await TaiSanPhamAsync();
             await TaiDonHangAsync();
+            await TaiKhachHangAsync(); // de khach moi vua tao xuat hien trong dropdown lan sau
         }
         catch (Exception ex)
         {
@@ -320,6 +372,7 @@ public partial class MainWindow : Window
             await Task.Run(() => _db.NhapThemHang(sp.MaSP, soLuong));
 
             await TaiSanPhamAsync();
+            await TaiLichSuNhapAsync();
 
             SetStatus($"Da nhap them {soLuong} '{sp.TenSP}'. Ton kho da cap nhat.");
             ShowInfoDialog("📥 Nhap hang thanh cong!", $"Da nhap them {soLuong} '{sp.TenSP}' vao kho.");

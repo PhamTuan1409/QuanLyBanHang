@@ -122,7 +122,13 @@
                         <StackPanel Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <TextBlock Text="👤 Khách hàng:" VerticalAlignment="Center" Width="100" Foreground="#222222" />
-                                <ComboBox x:Name="CboKhachHang" Width="220" PlaceholderText="Chọn khách hàng..." />
+                                <ComboBox x:Name="CboKhachHang" Width="220" PlaceholderText="Chọn khách hàng...">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="models:KhachHang">
+                                            <TextBlock Text="{Binding HienThi}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
 
                                 <TextBox x:Name="TxtTenKhachHang" Width="180" Watermark="Tên mới..." />
                                 <TextBox x:Name="TxtSoDienThoai" Width="140" Watermark="SĐT mới..." />
@@ -225,11 +231,35 @@
                     </Border>
 
                     <Border Classes="card">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="💡 Tình trạng kho" FontSize="18" FontWeight="Bold" Foreground="#123F5D" />
-                            <TextBlock Text="Sau khi nhập hàng, số lượng tồn kho sẽ được cập nhật ngay." Foreground="#666666" />
-                            <TextBlock Text="🔴 Hết hàng → nhập thêm → 🟢 Còn hàng" FontWeight="Bold" Foreground="#16A34A" />
-                        </StackPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="📜 Lịch sử nhập hàng (7 ngày gần đây)"
+                                       FontSize="18" FontWeight="Bold" Foreground="#123F5D" Margin="0,0,0,10" />
+
+                            <TextBlock x:Name="TxtLichSuTrong" DockPanel.Dock="Top"
+                                       Text="Chưa có lượt nhập hàng nào trong 7 ngày qua." Foreground="#888"
+                                       IsVisible="False" Margin="0,0,0,8" />
+
+                            <ScrollViewer MaxHeight="380">
+                                <ItemsControl x:Name="ListLichSuNhap">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:LichSuNhapHang">
+                                            <Border BorderBrush="#EEEEEE" BorderThickness="0,0,0,1" Padding="0,8">
+                                                <Grid ColumnDefinitions="140,*,Auto,Auto">
+                                                    <TextBlock Grid.Column="0" Text="{Binding NgayNhapHienThi}"
+                                                               Foreground="#888" FontSize="12" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding TenSP}"
+                                                               FontWeight="Bold" Foreground="#222222" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding SoLuong, StringFormat='+{0}'}"
+                                                               Foreground="#16A34A" FontWeight="Bold" Margin="10,0" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="3" Text="{Binding ThanhTien, StringFormat='{}{0:N0} đ'}"
+                                                               Foreground="#888" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
                     </Border>
                 </DockPanel>
             </TabItem>

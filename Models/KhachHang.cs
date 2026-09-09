@@ -11,4 +11,7 @@ public class KhachHang
     public string? DiaChi { get; set; }
     public string HangThanhVien { get; set; } = "Bac";
     public DateTime NgayDangKy { get; set; }
+
+    public string HienThi =>
+        string.IsNullOrWhiteSpace(SoDienThoai) ? HoTen : $"{HoTen} - {SoDienThoai}";
 }

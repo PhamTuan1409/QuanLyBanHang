@@ -96,20 +96,146 @@ public class DatabaseHelper
         using var conn = GetConnection();
         conn.Open();
 
+        using var transaction = conn.BeginTransaction();
+
+        try
+        {
+            // Lay gia nhap hien tai cua san pham
+            const string giaSql = @"
+                SELECT GiaNhap
+                FROM SAN_PHAM
+                WHERE MaSP = @MaSP";
+
+            using var giaCmd = new SqlCommand(giaSql, conn, transaction);
+            giaCmd.Parameters.AddWithValue("@MaSP", maSP);
+
+            var giaNhapObj = giaCmd.ExecuteScalar();
+            if (giaNhapObj == null)
+                throw new Exception("Không tìm thấy sản phẩm.");
+
+            decimal giaNhap = (decimal)giaNhapObj;
+
+            // Tao phieu nhap (dung nha cung cap dau tien lam mac dinh,
+            // vi giao dien nhap hang hien tai chua cho chon NCC rieng)
+            const string ncSql = "SELECT MIN(MaNCC) FROM NHA_CUNG_CAP";
+            using var ncCmd = new SqlCommand(ncSql, conn, transaction);
+            var maNccObj = ncCmd.ExecuteScalar();
+
+            if (maNccObj == null || maNccObj is DBNull)
+                throw new Exception("Chưa có nhà cung cấp nào trong hệ thống.");
+
+            int maNcc = (int)maNccObj;
+            const int maNVNhapHang = 1;
+            decimal tongGiaTri = giaNhap * soLuong;
+
+            const string insertPN = @"
+                INSERT INTO PHIEU_NHAP_HANG
+                (
+                    NgayNhap,
+                    TongGiaTri,
+                    MaNCC,
+                    MaNV
+                )
+                OUTPUT INSERTED.MaPN
+                VALUES
+                (
+                    DATEADD(hour, 7, GETDATE()),
+                    @TongGiaTri,
+                    @MaNCC,
+                    @MaNV
+                )";
+
+            using var insertPNCmd = new SqlCommand(insertPN, conn, transaction);
+            insertPNCmd.Parameters.AddWithValue("@TongGiaTri", tongGiaTri);
+            insertPNCmd.Parameters.AddWithValue("@MaNCC", maNcc);
+            insertPNCmd.Parameters.AddWithValue("@MaNV", maNVNhapHang);
+
+            int maPN = (int)insertPNCmd.ExecuteScalar();
+
+            const string insertCTPN = @"
+                INSERT INTO CHI_TIET_PHIEU_NHAP
+                (
+                    MaPN,
+                    MaSP,
+                    SoLuongNhap,
+                    DonGiaNhap
+                )
+                VALUES
+                (
+                    @MaPN,
+                    @MaSP,
+                    @SoLuongNhap,
+                    @DonGiaNhap
+                )";
+
+            using var insertCTPNCmd = new SqlCommand(insertCTPN, conn, transaction);
+            insertCTPNCmd.Parameters.AddWithValue("@MaPN", maPN);
+            insertCTPNCmd.Parameters.AddWithValue("@MaSP", maSP);
+            insertCTPNCmd.Parameters.AddWithValue("@SoLuongNhap", soLuong);
+            insertCTPNCmd.Parameters.AddWithValue("@DonGiaNhap", giaNhap);
+
+            insertCTPNCmd.ExecuteNonQuery();
+
+            const string updateSP = @"
+                UPDATE SAN_PHAM
+                SET SoLuongTon = SoLuongTon + @SoLuong
+                WHERE MaSP = @MaSP";
+
+            using var updateCmd = new SqlCommand(updateSP, conn, transaction);
+            updateCmd.Parameters.AddWithValue("@MaSP", maSP);
+            updateCmd.Parameters.AddWithValue("@SoLuong", soLuong);
+
+            int rows = updateCmd.ExecuteNonQuery();
+            if (rows == 0)
+                throw new Exception("Không tìm thấy sản phẩm.");
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    // ---------------- LICH SU NHAP HANG ----------------
+
+    public List<LichSuNhapHang> LayLichSuNhapHang(int soNgay = 7)
+    {
+        var list = new List<LichSuNhapHang>();
+
+        using var conn = GetConnection();
+        conn.Open();
+
         const string sql = @"
-            UPDATE SAN_PHAM
-            SET SoLuongTon = SoLuongTon + @SoLuong
-            WHERE MaSP = @MaSP";
+            SELECT
+                pn.NgayNhap,
+                sp.TenSP,
+                ct.SoLuongNhap,
+                ct.SoLuongNhap * ct.DonGiaNhap AS ThanhTien
+            FROM CHI_TIET_PHIEU_NHAP ct
+            INNER JOIN PHIEU_NHAP_HANG pn ON ct.MaPN = pn.MaPN
+            INNER JOIN SAN_PHAM sp ON ct.MaSP = sp.MaSP
+            WHERE pn.NgayNhap >= DATEADD(day, -@SoNgay, CAST(DATEADD(hour, 7, GETDATE()) AS DATE))
+            ORDER BY pn.NgayNhap DESC";
 
         using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@SoNgay", soNgay);
 
-        cmd.Parameters.AddWithValue("@MaSP", maSP);
-        cmd.Parameters.AddWithValue("@SoLuong", soLuong);
+        using var reader = cmd.ExecuteReader();
 
-        int rows = cmd.ExecuteNonQuery();
+        while (reader.Read())
+        {
+            list.Add(new LichSuNhapHang
+            {
+                NgayNhap = reader.GetDateTime(0),
+                TenSP = reader.GetString(1),
+                SoLuong = reader.GetInt32(2),
+                ThanhTien = reader.GetDecimal(3)
+            });
+        }
 
-        if (rows == 0)
-            throw new Exception("Không tìm thấy sản phẩm.");
+        return list;
     }
 
     // ---------------- DANH_MUC_SAN_PHAM ----------------
@@ -180,6 +306,22 @@ public class DatabaseHelper
         using var conn = GetConnection();
         conn.Open();
 
+        // Neu da co khach hang voi cung SDT thi tai su dung, khong tao trung
+        if (!string.IsNullOrWhiteSpace(soDienThoai))
+        {
+            const string checkSql = @"
+                SELECT MaKH
+                FROM KHACH_HANG
+                WHERE SoDienThoai = @SoDienThoai";
+
+            using var checkCmd = new SqlCommand(checkSql, conn);
+            checkCmd.Parameters.AddWithValue("@SoDienThoai", soDienThoai);
+
+            var existing = checkCmd.ExecuteScalar();
+            if (existing != null)
+                return (int)existing;
+        }
+
         const string sql = @"
             INSERT INTO KHACH_HANG
             (
@@ -194,7 +336,7 @@ public class DatabaseHelper
                 @HoTen,
                 @SoDienThoai,
                 N'Bac',
-                GETDATE()
+                DATEADD(hour, 7, GETDATE())
             )";
 
         using var cmd = new SqlCommand(sql, conn);
@@ -312,6 +454,7 @@ public class DatabaseHelper
             const string insertHD = @"
                 INSERT INTO HOA_DON
                 (
+                    NgayLap,
                     HinhThucThanhToan,
                     TongTien,
                     TrangThai,
@@ -321,6 +464,7 @@ public class DatabaseHelper
                 OUTPUT INSERTED.SoHD
                 VALUES
                 (
+                    DATEADD(hour, 7, GETDATE()),
                     @HTTT,
                     @TongTien,
                     N'DaThanhToan',
